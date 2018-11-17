@@ -1,5 +1,11 @@
-install.packages("RJDBC")
+## connecting to Redshift database and running SQL queries to pull data into R
+
+## The steps on this page first need to be done to make rJava and RJDBC work properly on MacOS
+## http://www.owsiak.org/r-java-rjava-and-macos-adventures/
+
+## install packages needed to connct to redshift db
 install.packages("rJava")
+install.packages("RJDBC")
 library(RJDBC)
 #Sys.setenv(JAVA_HOME="'/Library/Java/JavaVirtualMachines/jdk1.8.0_191.jdk/Contents/RHome'")
 #Sys.getenv("JAVA_HOME")
@@ -7,7 +13,6 @@ library(RJDBC)
 # connect to Amazon Redshift
 driver <- JDBC("com.amazon.redshift.jdbc.Driver", "/Users/jeffreyli/Downloads/RedshiftJDBC42-1.2.1.1001.jar", identifier.quote="`")
 #url <- "jdbc:redshift://demo.ckffhmu2rolb.eu-west-1.redshift.amazonaws.com:5439/demo?user=XXX&password=XXX"
-
 url <- "jdbc:postgresql://woden-redshift.p11a.com:5439/woden?user=jeffli&password=hQtK5YuVqJ0cL9eu3Tx1I9KiCSjB8Gdf"
 conn <- dbConnect(driver, url)
 
