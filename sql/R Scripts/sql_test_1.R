@@ -1,9 +1,11 @@
 ## connecting to Redshift database and running SQL queries to pull data into R
 
-## The steps on this page first need to be done to make rJava and RJDBC work properly on MacOS
+## install Latest versions of R & R Studio
+
+## After installing, the steps on this page first need to be done to make rJava and RJDBC work properly on MacOS
 ## http://www.owsiak.org/r-java-rjava-and-macos-adventures/
 
-## install packages needed to connct to redshift db
+## install packages needed to connect to redshift db
 install.packages("rJava")
 install.packages("RJDBC")
 library(RJDBC)
@@ -21,9 +23,9 @@ conn <- dbConnect(driver, url)
 sqlText <- "
   select case when user_computed_email_domain_group in ('GMAIL','YAHOO','AOL','MSN') then user_computed_email_domain_group else 'OTHER' end as domain_group
   , count(*)
-  from dbm.jc_mailable_universe_matrix_classification 
-  group by 1 
-  order by 1; 
+  from dbm.jc_mailable_universe_matrix_classification
+  group by 1
+  order by 1;
   "
 
 sqlText <- "
@@ -87,8 +89,8 @@ ab_results
 
 ab_results["emails_sent"]
 ab_results[,c("emails_sent","emails_opened","emails_clicked")]
-ab_results_agg <- aggregate(x = ab_results[,c("emails_sent","emails_opened","emails_clicked")], 
-          by = list(unique.test_groups = ab_results$test_group), #, unique.dates = ab_results$send_date), 
+ab_results_agg <- aggregate(x = ab_results[,c("emails_sent","emails_opened","emails_clicked")],
+          by = list(unique.test_groups = ab_results$test_group), #, unique.dates = ab_results$send_date),
           FUN = sum) #length)
 
 ab_results_metrics <- cbind(
