@@ -520,6 +520,32 @@ str(combined)
 ##************
 
 
-install.packages("randomForest")
+##install.packages("randomForest")
+library(randomForest)
+rf.train.1 <- combined[1:891, c("Pclass","Title")]
+rf.label <- as.factor(train$Survived)
+
+set.seed(1234) ## allows for reproduceability across trials
+
+## train model
+rf.1 <- randomForest(x = rf.train.1
+                     , y = rf.label
+                     , importance = TRUE ## track relative importance of features
+                     , ntree = 1000 ## default is 500 trees, ok
+                     )
+rf.1
+
+## confusion matrix: rows show actual label; columns show model's classification.
+#### 2% deaths (13/549) were classified as survived
+#### 51% survivals (168/342) were classified as died
+## overall 20.3% error rate
+
+
+
+varImpPlot(rf.1)
+?randomForest
+
+
+
 
 
