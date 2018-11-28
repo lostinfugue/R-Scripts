@@ -360,12 +360,25 @@ limit 100000
 ;
 
 
-select expired_job_email_arrivals_last_7d
+select
+round(expired_job_email_arrivals_last_7d::float / email_arrivals_last_7d, 1) as pct_arrivals_expired
+, email_osd_4
+-- , email_arrived
+, count(*) a
+, a::float / sum(a) over(partition by pct_arrivals_expired) prob_x
+from #dataset
+where email_arrivals_last_7d > 0
+group by 1,2
+order by 2 desc,1
+;
+
+select
+survey_response_7
 -- , email_osd_4
 , email_arrived
 , count(*) a
-, a::float / sum(a) over(partition by expired_job_email_arrivals_last_7d)
+, a::float / sum(a) over(partition by survey_response_7) prob_x
 from #dataset
 group by 1,2
-order by 1,2
+order by 2 desc,1
 ;
