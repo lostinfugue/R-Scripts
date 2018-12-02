@@ -224,6 +224,8 @@ ggplot(combined[1:891,] ,aes(x = ifelse(is.na(age),105, age),fill = survived)) +
 
 #### name --> title
 
+Predictive? **Yes**
+
 ##### Name Patterns
 *Mr.*: `<lname>, <title>. <fname>`
 
@@ -292,13 +294,129 @@ cowplot::plot_grid(c1,c2, labels = "AUTO", ncol=2)
 
 #### sibsp
 
+Predictive? **Yes**
+
+
+```{r}
+summary(combined$sibsp)
+```
+
+```{r echo=FALSE}
+sibsp.summary <- combined[1:891,] %>% 
+  group_by(sibsp, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+d1 <- ggplot(sibsp.summary, aes(x= sibsp, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+d2 <- ggplot(sibsp.summary, aes(x= sibsp, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
+```
+
+
 #### parch
+
+Predictive? **maybe**
+
+
+```{r}
+summary(combined$parch)
+```
+
+```{r echo=FALSE}
+parch.summary <- combined[1:891,] %>% 
+  group_by(parch, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+d1 <- ggplot(parch.summary, aes(x= parch, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+d2 <- ggplot(parch.summary, aes(x= parch, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
+```
 
 #### sibsp + parch --> family.size
 
+Predictive? **Maybe**
+
+```{r}
+combined$family.size <- combined$sibsp + combined$parch
+family.size.summary <- combined[1:891,] %>% 
+  group_by(family.size, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+d1 <- ggplot(family.size.summary, aes(x= family.size, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+d2 <- ggplot(family.size.summary, aes(x= family.size, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
+```
+
+
+
 #### fare
 
+
+```{r}
+summary(combined$fare)
+```
+
+* Fare looks to be a sum of the fare paid for a **ticket**.
+* Looks like there are instances where a ticket is shared by multiple passengers.  in these cases, the fare is the same across these passengers.
+* This case is a wealthy family (mother and son) traveling with two non-family members (servants?).  Mother and son share 3 rooms together.
+
+
+```{r}
+combined[which(combined$ticket == "PC 17755"),c("passengerid", "age", "name", "fare", "ticket","cabin","family.size")]
+```
+
+* There are also some data suggesting that getting mroe rooms could be associated with higher fare
+
+
+For a first stab, let's try normalizing for number of passengers by averaging the fare by number of people sharing that ticket.
+
+```{r}
+ticket.party.size <- rep(0, nrow(combined))
+avg.fare <- rep(0.0, nrow(combined))
+tickets <- unique(combined$ticket)
+
+## for each ticket
+for (i in 1:length(tickets)) {
+  current.ticket <- tickets[i]
+  ## get indexes associated with ticket
+  party.indexes <- which(combined$ticket == current.ticket)
+  ## calculate average fare per passenger for this ticket
+  avg.current.fare <- combined[party.indexes[1], "fare"] / length(party.indexes)
+  
+  ## set avg fare and ticket party size for those people in that ticket party.
+  for (j in 1:length(party.indexes)) {
+    ticket.party.size[party.indexes[j]] <- length(party.indexes)
+    avg.fare[party.indexes[j]] <- avg.current.fare
+  }
+}
+
+combined$ticket.party.size <- ticket.party.size
+combined$avg.fare <- avg.fare
+
+```
+
+we have 1 n/a for avg. fare, so will want to impute value in order to use in model.
+```{r}
+summary(combined$ticket.party.size)
+summary(combined$avg.fare)
+```
+
 #### cabin
+
 
 #### embarked
 
