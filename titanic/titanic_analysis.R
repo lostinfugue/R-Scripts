@@ -48,16 +48,24 @@ combined$Name <- as.character(combined$Name)
 ## number of survivors vs. non-survivors
 summary(train$Survived) ## numbers from 0 to 1 inclusive
 ## 549 0 vs. 342 1
+## 61% death rate <-- our error rate if our model predicted 1 every time
+## 39% survival rate <-- our error rate if our model predicted 0 every time
+## can we do better through incorporating data from features?
 survival_summary <- aggregate(x = train$PassengerId ## aggregate function is like a group by in SQL
           , by = list(survival_status = train$Survived)
           , FUN = length) 
 survival_summary
 
+#### get equivalent aggregation & summary using dplyr package
+# install.packages("dplyr")
+library(dplyr)
+combined[1:891,] %>% 
+  group_by(Survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
 
 ## same, but by class: 1st, 2nd or 3rd
 summary(train$Pclass) ## numbers 1,2,3.  no n/a's
-#### get equivalent aggregation & summary using dplyr package
-#### library(dplyr)
 combined[1:891,] %>% 
   group_by(Survived, Pclass) %>% 
   summarize(count=n()) %>% 
@@ -79,7 +87,7 @@ combined[1:891,] %>%
 
 
 ## CrossTable from gmodels package is a bit easier to use, like a pivot table
-#install.packages("gmodels")
+# install.packages("gmodels")
 library(gmodels)
 
 #very nice output using gmodels package
@@ -103,7 +111,7 @@ hist(train$Age, breaks=seq(0,100,l=11),
 
 
 ## histogram of age bins & Survival within each using ggplot2
-#install.packages("ggplot2")
+# install.packages("ggplot2")
 library(ggplot2)
 ggplot(train,aes(x = ifelse(is.na(Age),-10, Age),fill = as.factor(Survived))) + 
   geom_bar(position = "fill") + stat_bin(bins = 10)
@@ -319,6 +327,7 @@ library(scales)
 ## Graph Survival by Family Size
 ## seems to increase until 4 then be low.
 ## could be correlated with socio-economic factors, or not?
+# install.packages("cowplot")
 family.size.summary <- combined[1:891,] %>% 
   group_by(family.size, Survived) %>% 
   summarize(count=n()) %>% 
@@ -520,14 +529,17 @@ str(combined)
 ##************
 
 
-##install.packages("randomForest")
+# install.packages("randomForest")
 library(randomForest)
 rf.train.1 <- combined[1:891, c("Pclass","Title")]
 rf.label <- as.factor(train$Survived)
 
 set.seed(1234) ## allows for reproduceability across trials
 
-## train model
+
+############################
+## Model 1
+## train 1st model using top 2 features
 rf.1 <- randomForest(x = rf.train.1
                      , y = rf.label
                      , importance = TRUE ## track relative importance of features
@@ -535,24 +547,170 @@ rf.1 <- randomForest(x = rf.train.1
                      )
 rf.1
 
+
+
 ## confusion matrix: rows show actual label; columns show model's classification.
 #### 2% deaths (13/549) were classified as survived
 #### 51% survivals (168/342) were classified as died
 ## overall 20.3% error rate
 
-
+## recall that 61% of people died in the training set.
+## our model does better than just guessing Survived = 0 for everybody
+## (20.3% error rate vs. 39% error rate in "naive" approach)
 
 varImpPlot(rf.1)
-?randomForest
+## features farther to right are more predictive
+
+
+############################
+## Model 2
+## train 2nd model for comparison
+## 11% deaths classified as survival (false positive)
+## 30% survivals classified as death (false negative)
+## overall 18.7% error rate (marginally better)
+rf.train.2 <- combined[1:891, c("Pclass","Title", "family.size")]
+set.seed(1234) ## allows for reproduceability across trials
+rf.2 <- randomForest(x = rf.train.2
+                     , y = rf.label
+                     , importance = TRUE ## track relative importance of features
+                     , ntree = 1000 ## default is 500 trees, ok
+)
+rf.2
+
+############################
+## Model 3
+
+## 11% deaths classified as survival (false positive)
+## 30% survivals classified as death (false negative)
+## overall 18.7% error rate (marginally better)
+rf.train.3 <- combined[1:891, c("Pclass","Title","SibSp","Parch")]
+set.seed(1234) ## allows for reproduceability across trials
+rf.3 <- randomForest(x = rf.train.3
+                     , y = rf.label
+                     , importance = TRUE ## track relative importance of features
+                     , ntree = 1000 ## default is 500 trees, ok
+)
+rf.3
+
+
+varImpPlot(rf.2)
+varImpPlot(rf.3)
+
+
+
+##************
+##
+## Cross Validation
+##
+##************
+
+
+###############
+## How to estimate error rate on your model using unseen data
+
+
+
+## Subset test records for model
+test.submit.df <- combined[892:1309, c("Pclass","Title","family.size")]
+
+## Make predictions
+# ?predict
+rf.2.preds <- predict(rf.2, test.submit.df)
+CrossTable(rf.2.preds)
+
+## convert to csv for submission to kaggle
+# ?write.csv
+submit.df <- data.frame(PassengerId = rep(892:1309), Survived = rf.2.preds)
+write.csv(submit.df, file="RF_SUBMIT_20181125_1.csv", row.names=FALSE)
+
+# install.packages("caret")
+# install.packages("doSNOW")
+library(caret)
+library(doSNOW)
+
+# help(package = "caret")
+
+set.seed(54321)
+cv.10.folds <- createMultiFolds(rf.label, k = 10, times = 10)
+# ?createMultiFolds
+
+# Check stratification (i.e. our ratio of positive vs. negative predicted outcomes is relatively consistent across folds & samples)
+CrossTable(rf.label)
+549/342 #1.605
+
+
+CrossTable(rf.label[cv.10.folds[[12]]])
+494/308 #1.604
+
+
+
+## set up caret's trainControl object
+ctrl.1 <- trainControl(method = "repeatedcv", number = 10, repeats = 10
+                       , index = cv.10.folds)
+
+## set up DSNOW to take advantage of multiple cores of computer to thread processes
+cl <- makeCluster(6, type="SOCK")
+registerDoSNOW(cl)
+
+# set seed for reproduc.
+# and train
+
+set.seed(54321)
+rf.2.cv.1 <- train(x = rf.train.2, y = rf.label, method = "rf", tuneLength = 3, ntree = 1000, trControl = ctrl.1)
+# install.packages("e1071")
+# library(e1071)
+
+# shut down cluster
+stopCluster(cl)
+
+
+## checkout results
+rf.2.cv.1
+##81% acuracy
+rf.2
+1-.1818
+##81.82% accuacy on original rf train
+
+##so slightly lower on cross validation, but we know when submitted to kaggle that accuracy was around 79% so even lower
+## could be that with 10 folds, we are still using 90% of data to train, leanding to over sampling
 
 
 
 
-## questions to follow up on
-## how do i get column names lowercase?
+## retry with 5 folds (80% of data used to train)
+set.seed(54321)
+cv.5.folds <- createMultiFolds(rf.label, k = 5, times = 10)
+
+
+## set up caret's trainControl object
+ctrl.2 <- trainControl(method = "repeatedcv", number = 5, repeats = 10
+                       , index = cv.5.folds)
+
+cl <- makeCluster(6, type="SOCK")
+registerDoSNOW(cl)
+
+set.seed(54321)
+rf.2.cv.2 <- train(x = rf.train.2, y = rf.label, method = "rf", tuneLength = 3, ntree = 1000, trControl = ctrl.2)
+stopCluster(cl)
+rf.2.cv.2
 
 
 
-## want generalizable model
-## features that make sense?
-## don't compare scores from public data set used for score on leaderboard too much -- leads to overfitting
+## still not great
+## retry with 3 folds (67% of data used to train)
+## without knowingn anything about data, 10folds is good to start
+## but also, usually mimicking proportions of actual training and test data sets works well.
+set.seed(54321)
+cv.3.folds <- createMultiFolds(rf.label, k = 3, times = 10)
+
+
+## set up caret's trainControl object
+ctrl.3 <- trainControl(method = "repeatedcv", number = 3, repeats = 10
+                       , index = cv.3.folds)
+
+cl <- makeCluster(6, type="SOCK")
+registerDoSNOW(cl)
+
+set.seed(54321)
+rf.2.cv.3 <- train(x = rf.train.2, y = rf.label, method = "rf", tuneLength = 3, ntree = 1000, trControl = ctrl.3)
+stopCluster(cl)
