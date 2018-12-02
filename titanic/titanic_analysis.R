@@ -5,7 +5,7 @@
 ##************
 
 test <- read.csv("test.csv",header = TRUE)
-train <- read.csv("train.csv",header = TRUE)
+train <- read.csv("train.csv",header = TRUE
 
 
 ##************
@@ -548,4 +548,11 @@ varImpPlot(rf.1)
 
 
 
+## questions to follow up on
+## how do i get column names lowercase?
 
+
+
+## want generalizable model
+## features that make sense?
+## don't compare scores from public data set used for score on leaderboard too much -- leads to overfitting

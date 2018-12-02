@@ -1,6 +1,8 @@
 ---
-title: "Titanic Output"
-output: html_document
+title: "Titanic Analysis Learnings Summary"
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -8,9 +10,310 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r cars}
-summary(cars)
+Review material from Data Analysis and highlight key learnings
+
+
+## (1) Initial Data Analysis
+### Load data into R 
+using `read.csv` method
+```{r results = "hide"}
+test <- read.csv("test.csv",header = TRUE)
+train <- read.csv("train.csv",header = TRUE)
 ```
+
+### Understand data
+
+#### Look at Data Dictionary  
+https://www.kaggle.com/c/titanic/data
+
+Variable    | Definition           	 | Key                |
+------------|------------------------|--------------------|
+survival    | Survival               | 0 = No, 1 = Yes    |
+pclass      |	Ticket class            |	1 = 1st, 2 = 2nd, 3 = 3rd |
+sex         |	Sex	                    |                         |
+age	| Age in years	| |
+sibsp	| # of siblings / spouses aboard the Titanic	| |
+parch	| # of parents / children aboard the Titanic	| |
+ticket  |	Ticket number	  |
+fare  |	Passenger fare	 |
+cabin	| Cabin number	 |
+embarked  |	Port of Embarkation	| C = Cherbourg, Q = Queenstown, S = Southampton  |
+##### Variable Notes
+**pclass**: A proxy for socio-economic status (SES)
+1st = Upper
+2nd = Middle
+3rd = Lower
+
+**age**: Age is fractional if less than 1. If the age is estimated, is it in the form of xx.5
+
+**sibsp**: The dataset defines family relations in this way...
+Sibling = brother, sister, stepbrother, stepsister
+Spouse = husband, wife (mistresses and fiancés were ignored)
+
+**parch**: The dataset defines family relations in this way...
+Parent = mother, father
+Child = daughter, son, stepdaughter, stepson
+Some children travelled only with a nanny, therefore parch=0 for them.
+
+##### Notes:
+* `survival` is the classification variable
+
+
+#### Look at data itself
+```{r}
+head(train)
+```
+##### Notes:
+* why don't the column names match the data dictionary.  fix that.
+```{r results = "hide"}
+colnames(train) <- tolower(colnames(train))
+colnames(test) <- tolower(colnames(test))
+```
+
+
+#### Look at data structure
+```{r}
+str(train)
+```
+We can see the data types.
+
+
+#### Look at summary statistics.  Understand prevelance of missing / null data.
+
+```{r}
+summary(train)
+```
+
+#### Look at train vs. test splits. 
+* About 2/3 train (1:891), 1/3 test (892:1309) 
+* Union together using `rbind()` into a combined dataframe in which we store any newly engineered features so that they are available both when training and testing our models.   
+* At this point we can convert data types if it makes analysis easier.  or make a new column with the data with new data type.
+```{r results="hide"}
+## combine test and train datasets
+test.survived <- data.frame(survived = rep("None",nrow(test)),test[,])
+combined <- rbind(train, test.survived)
+
+## change datatypes
+combined$pclass <- as.factor(combined$pclass)
+combined$survived <- as.factor(combined$survived)
+combined$name <- as.character(combined$name)
+```
+
+
+### explore relationships between data fields vs. classification field `survived`
+
+**Goal**: make hypotheses for which features have predictive power and why
+
+#### Load Tools:
+* `gmodels`: use `CrossTable` to easily make tables of counts & proportions
+* `dplyr`: for aggregating data like sql/pivot table for proportions
+* `ggplot2`: use for plots
+* `cowplot`: use for plotting multiple graphs side-by-side
+* `stringr`: use for manipulating strings
+```{r message=FALSE} 
+library(dplyr)
+library(gmodels)
+library(ggplot2)
+library(cowplot)
+library(stringr)
+```
+
+
+#### survived
+
+* training set: 
+    + 549 (62%) perished
+    + 342 (38%) survived
+```{r results="hide"}
+## using gmodels CrossTable()
+CrossTable(train$survived)
+```
+```{r}
+## using dplyr
+combined[1:891,] %>% 
+  group_by(survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+```
+
+#### pclass
+Predictive? **Yes**
+
+* survival rates 
+    + 63% in 1st class
+    + 48% in 2nd class
+    + 24% in 3rd class
+```{r echo=FALSE, eval=FALSE}
+combined[1:891,] %>% 
+  group_by(pclass, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+```
+* % of passengers 
+    + 3rd class: 55%
+    + 1st: 24%
+    + 2nd: 21%
+```{r echo=FALSE, eval=FALSE}
+combined[1:891,] %>% 
+  group_by(pclass) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count), pct2 = count/sum(sum(count)))
+```
+
+```{r echo=FALSE}
+pclass.summary <- combined[1:891,] %>% 
+  group_by(pclass, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+a1 <- ggplot(pclass.summary, aes(x= pclass, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+a2 <- ggplot(pclass.summary, aes(x= pclass, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+cowplot::plot_grid(a1,a2, ncol=1, labels = "AUTO")
+```
+
+#### sex
+Predictive: **Yes**
+
+* survival rates 
+    + 74% for female
+    + 19% for male
+```{r echo=FALSE, eval=FALSE}
+combined[1:891,] %>% 
+  group_by(sex, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+```
+
+```{r echo=FALSE}
+sex.summary <- combined[1:891,] %>% 
+  group_by(sex, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+b1 <- ggplot(sex.summary, aes(x= sex, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+b2 <- ggplot(sex.summary, aes(x= sex, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7)
+
+cowplot::plot_grid(b1,b2, ncol=1, labels = "AUTO")
+```
+
+#### age
+
+Predictive? Maybe
+
+* 177 (```r round(177/891*100,2)```%) rows have null `age` value, so will be hard to use without imputing data somehow
+```{r}
+summary(combined[1:891, "age"])
+```
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(combined[1:891,] ,aes(x = ifelse(is.na(age),105, age),fill = survived)) + 
+  geom_bar(position = "fill") + 
+  stat_bin(bins = 10)
+```
+
+##### Notes:
+* add pct survival rate by age bin
+
+
+#### name --> title
+
+##### Name Patterns
+*Mr.*: `<lname>, <title>. <fname>`
+
+*Mrs.*: `<lname>, <title>. <husband fname> <husband mname> (<fname> <mname>)`
+
+*Ms.*: `<lname>, <title>. <fname>`
+
+
+Extract last names and titles from `name` and add to combined data set
+
+```{r echo=FALSE} 
+
+## returns a list of names, where each name is separated into a vector with the part before and after the comma
+name.splits <- str_split(combined[,"name"],', ')
+#str_split(combined[1:5,"name"],', ')[[2]][2]
+
+## pull first part of each name before comma (last name)
+last.names <- sapply(name.splits, '[', 1)
+combined$last.name <- last.names
+
+## pull 2nd part of each name after the comma and before space (title)
+name.splits <- str_split(sapply(name.splits,"[", 2), " ")
+titles <- sapply(name.splits,"[",1)
+combined$title <- titles
+
+unique(combined$title)
+
+```
+
+Clean up titles and group them together
+```{r echo=FALSE}
+titles[titles %in% c("Jonkheer.","Don.")] <- "Sir."
+titles[titles %in% c("Lady.","Dona.","the")] <- "Lady."
+titles[titles %in% c("Col.","Capt.","Major.")] <- "Officer."
+titles[titles %in% c("Mme.")] <- "Mrs."
+titles[titles %in% c("Mlle.","Ms.")] <- "Miss."
+
+combined$title <- titles
+
+```
+
+
+Summarize them:
+
+```{r echo=FALSE}
+title.summary <- combined[1:891,] %>% 
+  group_by(title, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+c1 <- ggplot(title.summary, aes(x= title, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  theme(legend.position="bottom") +
+  coord_flip()
+
+
+c2 <- ggplot(title.summary, aes(x= title, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  theme(legend.position="bottom") +
+  coord_flip()
+
+cowplot::plot_grid(c1,c2, labels = "AUTO", ncol=2)
+```
+
+
+
+#### sibsp
+
+#### parch
+
+#### sibsp + parch --> family.size
+
+#### fare
+
+#### cabin
+
+#### embarked
+
+
+#### Summary of relevant features
+* 
+
+
+## (2) Exploratory modeling 1
+
+## (3) Cross Validation
+
+## (4) 
+
+
 
 ## Including Plots
 
