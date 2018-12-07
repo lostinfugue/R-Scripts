@@ -384,7 +384,7 @@ combined[which(combined$ticket == "PC 17755"),c("passengerid", "age", "name", "f
 
 For a first stab, let's try normalizing for number of passengers by averaging the fare by number of people sharing that ticket.
 
-```{r}
+```{r echo=FALSE}
 ticket.party.size <- rep(0, nrow(combined))
 avg.fare <- rep(0.0, nrow(combined))
 tickets <- unique(combined$ticket)
@@ -410,9 +410,30 @@ combined$avg.fare <- avg.fare
 ```
 
 we have 1 n/a for avg. fare, so will want to impute value in order to use in model.
-```{r}
+```{r echo = FALSE}
 summary(combined$ticket.party.size)
 summary(combined$avg.fare)
+
+## impute value for 1 missing avg fare from 370 similar passengers
+combined[which(is.na(combined$avg.fare)),]
+combined[which(combined$passengerid == "1044"),"avg.fare"] <- mean(combined[which(combined$sex == "male" 
+               & combined$pclass == 3
+               & combined$family.size == 0
+               & combined$title == "Mr."
+               & is.na(combined$avg.fare) == FALSE
+               ), "avg.fare"])
+
+```
+
+Graph relationship between survival and avg fare, by class and title.
+
+* relationship between avg fare and survival isn't clear.
+* family.size definitely seems to be an indicator for survival within pclass = 3
+```{r echo=FALSE}
+## graph relationship between survival and avg fare, by class and title
+ggplot(combined[1:891,], aes(x = avg.fare, y = family.size, color = survived)) + 
+  geom_point() +
+  facet_wrap(~title+pclass, ncol = 3)
 ```
 
 #### cabin
