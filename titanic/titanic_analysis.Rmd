@@ -212,10 +212,27 @@ Predictive? Maybe
 summary(combined[1:891, "age"])
 ```
 
-```{r echo=FALSE, warning=FALSE}
-ggplot(combined[1:891,] ,aes(x = ifelse(is.na(age),105, age),fill = survived)) + 
-  geom_bar(position = "fill") + 
-  stat_bin(bins = 10)
+
+Perhaps some trend in Male 1st class
+Otherwise, only really showing that children had better survival rates.
+```{r echo=FALSE, warning=FALSE, fig.height=7}
+# bin age by 10
+combined$age.bin <- cut(ifelse(is.na(combined$age),105, combined$age), c(0,10,20,30,40,50,60,80,120), labels = c(0,10,20,30,40,50,60,"na"))
+
+age.bin.summary <- combined[1:891,] %>% 
+  group_by(age.bin, sex, pclass, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+b1 <- ggplot(age.bin.summary, aes(x= age.bin, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  facet_wrap(~sex+pclass, ncol=3)
+
+b2 <- ggplot(age.bin.summary, aes(x= age.bin, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  facet_wrap(~sex+pclass, ncol=3)
+
+cowplot::plot_grid(b1,b2, ncol=1, labels = "AUTO")
 ```
 
 ##### Notes:
@@ -345,7 +362,7 @@ cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
 
 Predictive? **Maybe**
 
-```{r}
+```{r echo = FALSE}
 combined$family.size <- combined$sibsp + combined$parch
 family.size.summary <- combined[1:891,] %>% 
   group_by(family.size, survived) %>% 
@@ -362,9 +379,30 @@ cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
 ```
 
 
+Mr's 1st class
+Master 3rd class
+Miss / Mrses 3rd class
+```{r echo=FALSE, fig.height=10}
+family.size.summary <- combined[1:891,] %>% 
+  group_by(family.size, title, pclass, survived) %>% 
+  summarize(count=n()) %>% 
+  mutate(pct = count/sum(count))
+
+d1 <- ggplot(family.size.summary, aes(x= family.size, y = pct, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  facet_wrap(~title+pclass,ncol = 3)
+
+d2 <- ggplot(family.size.summary, aes(x= family.size, y = count, fill = survived)) +
+  geom_bar(stat="identity", width = 0.7) +
+  facet_wrap(~title+pclass,ncol = 3)
+
+cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
+```
+
+
 
 #### fare
-
+Predictive? **Maybe** for Mr's in 1st class.
 
 ```{r}
 summary(combined$fare)
