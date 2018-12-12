@@ -1,0 +1,134 @@
+---
+title: "recipes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Tools
+
+* rjson
+
+```{r echo = FALSE, message=FALSE, reformat=TRUE}
+# install.packages("rjson")
+require(data.table)
+require(jsonlite)
+require(dplyr)
+require(tidyr)
+
+```
+
+## Recipes Analysis
+Looking at data on 40k recipes, using ingredients + labeled cuisines to build a predictive classification model.  Testing model on 10k recipes unlabeled data set.
+
+### Load & Format Data
+
+* **Training Data**: 39774 recipes
+* **Test Data**: 9944 recipes
+
+```{r echo = FALSE, message=FALSE, reformat=TRUE}
+## load training and testing data
+train_file <- "data/train.json"
+test_file <- "data/test.json"
+train <- fromJSON(train_file)
+test <- fromJSON(test_file)
+
+train <- as_tibble(train)
+test <- as_tibble(test)
+
+#str(train)
+#str(test)
+```
+
+Flattened Training Data - 1 row per ingredient
+```{r echo = FALSE}
+train_ingredients <- train %>%
+  unnest(ingredients)
+
+train_ingredients
+```
+Flattened Test Data - 1 row per ingredient
+```{r echo = FALSE}
+
+test_ingredients <- test %>%
+  unnest(ingredients)
+
+test_ingredients
+```
+
+
+
+### Summarize Data
+```{r echo = FALSE}
+summary(train_ingredients)
+summary(test_ingredients)
+
+```
+
+#### How many total recipes are there?
+```{r echo = FALSE}
+
+train_recipe_count <- train_ingredients %>%
+  summarise(n_recipes = n_distinct(id))
+
+as.integer(train_recipe_count)
+
+```
+
+#### What are the different cuisines?  How many recipes are there in the training data?
+```{r echo = FALSE}
+
+train_cuisine_recipe_counts <- train_ingredients %>%
+  group_by(cuisine) %>%
+  summarise(n_recipes = n_distinct(id)) %>%
+  arrange(desc(n_recipes))
+
+train_cuisine_recipe_counts
+
+```
+
+
+#### What are the top ingredients per cuisine? How often do they appear in the training data?
+```{r echo = FALSE}
+train_ingredient_counts_by_cuisine <- train_ingredients %>%
+  group_by(cuisine) %>%
+  count(cuisine,ingredients) %>%
+  arrange(cuisine, desc(n))
+
+train_ingredient_frequencies_by_cuisine <- 
+  merge(train_ingredient_counts_by_cuisine, train_cuisine_recipe_counts) %>%
+  mutate(pct_of_cuisine_recipes = n/n_recipes)
+
+train_ingredient_frequencies_by_cuisine %>%
+  group_by(cuisine) %>%
+  arrange(cuisine, desc(n)) %>%
+   top_n(10)
+
+```
+
+#### What are the most distinctive ingredients per cuisine?
+```{r echo = FALSE}
+train_ingredient_counts <- train_ingredients %>%
+  group_by(ingredients) %>%
+  count(ingredients) %>%
+  arrange(desc(n))
+
+train_ingredient_frequencies <- 
+  train_ingredient_counts %>%
+  mutate(n_total_recipes = as.integer(train_recipe_count)) %>%
+  mutate(pct_of_total_recipes = n/n_total_recipes)
+
+
+merge(train_ingredient_frequencies_by_cuisine, train_ingredient_frequencies, by="ingredients") %>%
+  mutate(pct_diff = round((pct_of_cuisine_recipes - pct_of_total_recipes),2)) %>%
+  mutate(pct_of_cuisine_recipes = round(pct_of_cuisine_recipes,2)) %>%
+  mutate(pct_of_total_recipes = round(pct_of_total_recipes,2)) %>%
+  arrange(desc(pct_diff)) %>%
+  # arrange(pct_diff) %>%
+  select(ingredients, cuisine, pct_of_cuisine_recipes, pct_of_total_recipes, pct_diff) %>%
+  top_n(20)
+
+```
+
