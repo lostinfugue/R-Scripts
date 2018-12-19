@@ -7,13 +7,19 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+### Tutorials I'm Following: 
+
+* https://eight2late.wordpress.com/2015/05/27/a-gentle-introduction-to-text-mining-using-r/
+
+
 ## Load Tools
 
 * rjson
 
 ```{r echo = FALSE, message=FALSE, reformat=TRUE}
-# install.packages("rjson")
-require(data.table)
+install.packages("rjson")
+# require(data.table)
 require(jsonlite)
 require(dplyr)
 require(tidyr)
@@ -152,6 +158,9 @@ Create corpus
 # 1. create corpus
 corpus <- Corpus(VectorSource(combined$ingredients))
 
+## see each document
+writeLines(as.character(corpus[[1]]))
+
 # 2. Convert text to lowercase
 # ?tm_map
 corpus <- tm_map(corpus, tolower)
@@ -178,13 +187,18 @@ corpus[[1]]
 # 6. After we are done with pre-processing, it is necessary to convert the text into plain text document. This helps in pre-processing documents as text documents.
 corpus <- tm_map(corpus, PlainTextDocument)
 
+## see each document
+writeLines(as.character(corpus$content$content[1]))
+
 # 7. For further processing, we’ll create a document matrix where the text will categorized in columns
 
 
 
 #document matrix
+?DocumentTermMatrix
 frequencies <- DocumentTermMatrix(corpus) 
 frequencies
+inspect(frequencies[1:2,1000:1005])
 
 ```
 
