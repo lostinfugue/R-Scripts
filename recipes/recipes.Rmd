@@ -42,11 +42,11 @@ Looking at data on 40k recipes, using ingredients + labeled cuisines to build a 
 ## load training and testing data
 train_file <- "data/train.json"
 test_file <- "data/test.json"
-train <- fromJSON(train_file)
-test <- fromJSON(test_file)
+train <- jsonlite::fromJSON(train_file)
+test <- jsonlite::fromJSON(test_file)
 
-train <- as_tibble(train)
-test <- as_tibble(test)
+# train <- as_tibble(train)
+# test <- as_tibble(test)
 
 #str(train)
 #str(test)
@@ -157,6 +157,7 @@ Create corpus
 
 # 1. create corpus
 corpus <- Corpus(VectorSource(combined$ingredients))
+corpus
 
 ## see each document
 writeLines(as.character(corpus[[1]]))
@@ -164,33 +165,66 @@ writeLines(as.character(corpus[[1]]))
 # 2. Convert text to lowercase
 # ?tm_map
 corpus <- tm_map(corpus, tolower)
+corpus
 corpus[[1]]
+## see each document
+writeLines(as.character(corpus[1:10]$content))
 
+
+# 2a. Remove vector notation c("","",...)
+
+#create the removeVector content transformer
+removeVector <- content_transformer(function(x) {return (gsub("^c\\(|\\)$", "", x))})
+corpus <- tm_map(corpus, removeVector)
+corpus
+## see each document
+writeLines(as.character(corpus[1:10]$content))
+
+?tm_map
 
 
 # 3. Remove Punctuation
 corpus <- tm_map(corpus, removePunctuation)
 corpus[[1]]
+## see each document
+writeLines(as.character(corpus[1:10]$content))
+
 
 # 4.Remove Stopwords
 corpus <- tm_map(corpus, removeWords, c(stopwords('english')))
 corpus[[1]]
+## see each document
+writeLines(as.character(corpus[100:110]$content))
 
 # 5. Remove Whitespaces
 corpus <- tm_map(corpus, stripWhitespace)
 corpus[[1]]
+## see each document
+writeLines(as.character(corpus[100:110]$content))
+
+# 5. Remove Numbers
+corpus <- tm_map(corpus, removeNumbers)
+corpus[[1]]
+## see each document
+writeLines(as.character(corpus[100:110]$content))
+
 
 # 6. Perform Stemming
 corpus <- tm_map(corpus, stemDocument)
 corpus[[1]]
+corpus
+## see each document
+writeLines(as.character(corpus[100:110]$content))
 
-# 6. After we are done with pre-processing, it is necessary to convert the text into plain text document. This helps in pre-processing documents as text documents.
-corpus <- tm_map(corpus, PlainTextDocument)
+
+# 7. After we are done with pre-processing, it is necessary to convert the text into plain text document. This helps in pre-processing documents as text documents.
+# corpus <- tm_map(corpus, PlainTextDocument)
+# corpus
 
 ## see each document
 writeLines(as.character(corpus$content$content[1]))
 
-# 7. For further processing, we’ll create a document matrix where the text will categorized in columns
+# 8. For further processing, we’ll create a document matrix where the text will categorized in columns
 
 
 
@@ -199,6 +233,119 @@ writeLines(as.character(corpus$content$content[1]))
 frequencies <- DocumentTermMatrix(corpus) 
 frequencies
 inspect(frequencies[1:2,1000:1005])
+
+
+#organizing frequency of terms
+freq <- colSums(as.matrix(frequencies))
+length(freq)
+
+#create sort order (descending) for frequency
+ord <- order(freq,decreasing=TRUE)
+
+#inspect most frequently occurring terms
+freq[head(ord)]   
+
+#inspect least frequently occurring terms
+freq[tail(ord)]   
+
+filtered_frequencies <- DocumentTermMatrix(corpus, 
+   control=list(wordLengths=c(3, Inf), bounds = list(global = c(3,Inf))))
+inspect(filtered_frequencies[1:2,1:15])
+filtered_frequencies
+
+
+
+#organizing frequency of terms
+freq <- colSums(as.matrix(filtered_frequencies))
+length(freq)
+
+
+
+#create sort order (descending) for ingredient name length
+ord <- order(nchar(names(freq)),decreasing=TRUE)
+
+#inspect most frequently occurring terms
+freq[head(ord)]   
+
+#inspect least frequently occurring terms
+freq[tail(ord)]
+
+filtered_frequencies
+
+
+findFreqTerms(filtered_frequencies,lowfreq=1000)
+
+
+findAssocs(filtered_frequencies,'chees',0.3)
+findAssocs(filtered_frequencies,'rice',0.15)
+
+findAssocs(filtered_frequencies,'banana',0.15)
+
+findAssocs(filtered_frequencies,'tofu',0.15)
+
+findAssocs(filtered_frequencies,'bok',0.15)
+findAssocs(filtered_frequencies,'cream',0.15)
+findAssocs(filtered_frequencies,'coffe',0.1)
+
+findAssocs(filtered_frequencies,'egg',0.1)
+
+findAssocs(filtered_frequencies,'soda',0.1)
+
+findAssocs(filtered_frequencies,'water',0.1)
+findAssocs(filtered_frequencies,'oatmeal',0.1)
+findAssocs(filtered_frequencies, c('salt','oil'), corlimit=0.30)
+
+
+#create data frame
+
+df <- as.data.frame(as.matrix(filtered_frequencies))
+
+table(train$cuisine)
+
+
+#add cuisine
+df$cuisine <- as.factor(c(train$cuisine, rep('italian', nrow(test))))
+
+# split data into training and test set
+mytrain <- df[1:nrow(train),]
+mytest <- df[-(1:nrow(train)),]
+
+
+install.packages("xgboost")
+library(xgboost)
+library(Matrix)
+
+
+
+# creating the matrix for training the model
+ctrain <- xgb.DMatrix(Matrix(data.matrix(mytrain[,!colnames(mytrain) %in% c('cuisine')])), label = as.numeric(mytrain$cuisine)-1)
+
+
+#advanced data set preparation
+dtest <- xgb.DMatrix(Matrix(data.matrix(mytest[,!colnames(mytest) %in% c('cuisine')]))) 
+watchlist <- list(train = ctrain, test = dtest)
+
+#train multiclass model using softmax
+
+## 200 is too much for my machine?
+#first model
+xgbmodel <- xgboost(data = ctrain, max.depth = 25, eta = 0.3, nround = 200, objective = "multi:softmax", num_class = 20, verbose = 1
+                    # , watchlist = watchlist
+                    )
+
+?xgboost
+
+#second model
+xgbmodel2 <- xgboost(data = ctrain, max.depth = 20, eta = 0.2, nrounds = 250, objective = "multi:softmax", num_class = 20
+                     # , watchlist = watchlist
+                     )
+
+#third model
+xgbmodel3 <- xgboost(data = ctrain, max.depth = 25, gamma = 2, min_child_weight = 2, eta = 0.1, nround = 250, objective = "multi:softmax", num_class = 20, verbose = 2,
+                     # watchlist = watchlist
+                     )
+
+
 
 ```
 
