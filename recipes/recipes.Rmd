@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 * rjson
 
 ```{r echo = FALSE, message=FALSE, reformat=TRUE}
-install.packages("rjson")
+# install.packages("rjson")
 # require(data.table)
 require(jsonlite)
 require(dplyr)
@@ -26,7 +26,7 @@ require(tidyr)
 # install.packages("tm")
 library(tm)
 # install.packages(("SnowballC"))
-library(SnowballC)
+library(SnowballC) ## for stemming
 
 ```
 
@@ -147,6 +147,14 @@ Combine Training and Test Data into one dataset
 ```{r}
 test$cuisine <- NA
 combined <- rbind(train, test)
+
+## make cuisine a factor
+# train$cuisine <- as.factor(train$cuisine)
+# combined$cuisine <- as.factor(combined$cuisine)
+# levels(combined$cuisine)
+
+?tm_map
+
 ```
 
 
@@ -182,6 +190,8 @@ writeLines(as.character(corpus[1:10]$content))
 
 ?tm_map
 
+# replace hyphen with space before removing punctuation
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "\\-", replacement = "")
 
 # 3. Remove Punctuation
 corpus <- tm_map(corpus, removePunctuation)
@@ -221,8 +231,6 @@ writeLines(as.character(corpus[100:110]$content))
 # corpus <- tm_map(corpus, PlainTextDocument)
 # corpus
 
-## see each document
-writeLines(as.character(corpus$content$content[1]))
 
 # 8. For further processing, we’ll create a document matrix where the text will categorized in columns
 
@@ -233,6 +241,45 @@ writeLines(as.character(corpus$content$content[1]))
 frequencies <- DocumentTermMatrix(corpus) 
 frequencies
 inspect(frequencies[1:2,1000:1005])
+
+?grep
+inspect(frequencies[1:2,which(colnames(frequencies))])
+
+# noticed weird characters
+# find non a-z chars and replace them if regular words
+length(colnames(frequencies))
+head(grep('[^a-z]+',colnames(frequencies)))
+## 79 ingredients with weird chars
+colnames(frequencies)[grep('[^a-z]+',colnames(frequencies))]
+head(colnames(frequencies)[which(colnames(frequencies) %in% c('gruyer','acai','gruyèr','pate','ragu','pure','creme'))])
+
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "(®|™|’)", replacement = "")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "è", replacement = "e")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "é", replacement = "e")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "ç", replacement = "c")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "â", replacement = "a")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "í", replacement = "i")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "î", replacement = "i")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "€", replacement = "e")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "ú", replacement = "u")
+
+
+
+# "organic®" # could indicate organic brand name, but probably better to just make normal organic word
+# "rice®"
+# "gruyèr" => "gruyer"
+# "açai" --> "acai"
+# "tabasco®"
+# pâté pâte
+# neufchâtel
+# white®
+# bell®
+# "giant™"
+
+#some numbers still pop up
+
+## curly single quote "sheep’"
+
 
 
 #organizing frequency of terms
@@ -273,7 +320,7 @@ freq[tail(ord)]
 filtered_frequencies
 
 
-findFreqTerms(filtered_frequencies,lowfreq=1000)
+findFreqTerms(filtered_frequencies,lowfreq=50)
 
 
 findAssocs(filtered_frequencies,'chees',0.3)
@@ -293,7 +340,11 @@ findAssocs(filtered_frequencies,'soda',0.1)
 
 findAssocs(filtered_frequencies,'water',0.1)
 findAssocs(filtered_frequencies,'oatmeal',0.1)
+findAssocs(filtered_frequencies,'salt',0.1)
 findAssocs(filtered_frequencies, c('salt','oil'), corlimit=0.30)
+findAssocs(filtered_frequencies,'pesto',0.1)
+findAssocs(filtered_frequencies, c('pesto','tomato'), corlimit=0.10)
+
 
 
 #create data frame
@@ -305,13 +356,19 @@ table(train$cuisine)
 
 #add cuisine
 df$cuisine <- as.factor(c(train$cuisine, rep('italian', nrow(test))))
+# install.packages("gdata")
+library(gdata)
+cuisine_mapping <- mapLevels(df$cuisine)
+cuisine_mapping
 
 # split data into training and test set
 mytrain <- df[1:nrow(train),]
 mytest <- df[-(1:nrow(train)),]
 
+a <- as.data.frame(cbind(cuisine = train$cuisine, cuisine_id = as.numeric(as.factor(train$cuisine))))
+?factor
 
-install.packages("xgboost")
+# install.packages("xgboost")
 library(xgboost)
 library(Matrix)
 
@@ -320,25 +377,61 @@ library(Matrix)
 # creating the matrix for training the model
 ctrain <- xgb.DMatrix(Matrix(data.matrix(mytrain[,!colnames(mytrain) %in% c('cuisine')])), label = as.numeric(mytrain$cuisine)-1)
 
+#Encode the levels as integers
+levels(mytrain$cuisine)
+?levels
 
 #advanced data set preparation
 dtest <- xgb.DMatrix(Matrix(data.matrix(mytest[,!colnames(mytest) %in% c('cuisine')]))) 
+
 watchlist <- list(train = ctrain, test = dtest)
 
 #train multiclass model using softmax
 
+
 ## 200 is too much for my machine?
+## Try with 5 cores
+
+# had to run `brew install libomp` initially in terminal to get caret installation to work on my mac os
+# install.packages("caret", dependencies = TRUE)
+# install.packages("doSNOW", dependencies = TRUE)
+library(caret)
+library(doSNOW)
+
+  ## start cluster
+  cl2 <- makeCluster(6, type = "SOCK")
+  registerDoSNOW(cl2)
+
+
 #first model
-xgbmodel <- xgboost(data = ctrain, max.depth = 25, eta = 0.3, nround = 200, objective = "multi:softmax", num_class = 20, verbose = 1
+xgbmodel <- xgboost(data = ctrain, max.depth = 25, eta = 0.3, nround = 30, objective = "multi:softmax", num_class = 20, verbose = 1
                     # , watchlist = watchlist
                     )
 
+  #Shutdown cluster
+  stopCluster(cl2)
+
+mappingTable = data.frame(cuisine=levels(mytrain$cuisine),code=seq(1,length(levels(mytrain$cuisine)))-1,stringsAsFactors = FALSE)
+
+pred_xgbmodel_submit$cuisine <- mappingTable$cuisine[match(pred_xgbmodel_submit$pred_xgbmodel,mappingTable$code)]
+
+  
 ?xgboost
+xgbmodel
+
+pred_xgbmodel <- predict(xgbmodel,dtest)
+pred_xgbmodel_submit <- cbind(pred_xgbmodel,test)
+(mapLevels(pred_xgbmodel_submit$pred_xgbmodel) <- cuisine_mapping)
+
+
+?mapLevels
+
 
 #second model
 xgbmodel2 <- xgboost(data = ctrain, max.depth = 20, eta = 0.2, nrounds = 250, objective = "multi:softmax", num_class = 20
                      # , watchlist = watchlist
                      )
+
 
 #third model
 xgbmodel3 <- xgboost(data = ctrain, max.depth = 25, gamma = 2, min_child_weight = 2, eta = 0.1, nround = 250, objective = "multi:softmax", num_class = 20, verbose = 2,
