@@ -143,6 +143,7 @@ merge(train_ingredient_frequencies_by_cuisine, train_ingredient_frequencies, by=
 ```
 
 
+#### Modeling
 Combine Training and Test Data into one dataset
 ```{r}
 test$cuisine <- NA
@@ -152,8 +153,6 @@ combined <- rbind(train, test)
 # train$cuisine <- as.factor(train$cuisine)
 # combined$cuisine <- as.factor(combined$cuisine)
 # levels(combined$cuisine)
-
-?tm_map
 
 ```
 
@@ -165,94 +164,67 @@ Create corpus
 
 # 1. create corpus
 corpus <- Corpus(VectorSource(combined$ingredients))
-corpus
-
 ## see each document
 writeLines(as.character(corpus[[1]]))
 
 # 2. Convert text to lowercase
-# ?tm_map
 corpus <- tm_map(corpus, tolower)
-corpus
-corpus[[1]]
 ## see each document
 writeLines(as.character(corpus[1:10]$content))
 
-
-# 2a. Remove vector notation c("","",...)
-
+# 3. Remove vector notation c("","",...)
 #create the removeVector content transformer
 removeVector <- content_transformer(function(x) {return (gsub("^c\\(|\\)$", "", x))})
 corpus <- tm_map(corpus, removeVector)
-corpus
 ## see each document
 writeLines(as.character(corpus[1:10]$content))
 
-?tm_map
-
-# replace hyphen with space before removing punctuation
+# 4. Replace hyphen with space before removing punctuation
 corpus <- tm_map(corpus, content_transformer(gsub), pattern = "\\-", replacement = "")
 
-# 3. Remove Punctuation
+# 5. Remove Punctuation
 corpus <- tm_map(corpus, removePunctuation)
-corpus[[1]]
 ## see each document
 writeLines(as.character(corpus[1:10]$content))
 
 
-# 4.Remove Stopwords
+# 6.Remove Stopwords
 corpus <- tm_map(corpus, removeWords, c(stopwords('english')))
-corpus[[1]]
 ## see each document
 writeLines(as.character(corpus[100:110]$content))
 
-# 5. Remove Whitespaces
+# 7. Remove Whitespaces
 corpus <- tm_map(corpus, stripWhitespace)
-corpus[[1]]
 ## see each document
 writeLines(as.character(corpus[100:110]$content))
 
-# 5. Remove Numbers
+# 8. Remove Numbers
 corpus <- tm_map(corpus, removeNumbers)
-corpus[[1]]
 ## see each document
 writeLines(as.character(corpus[100:110]$content))
 
 
-# 6. Perform Stemming
+# 9. Perform Stemming
 corpus <- tm_map(corpus, stemDocument)
-corpus[[1]]
-corpus
 ## see each document
 writeLines(as.character(corpus[100:110]$content))
 
 
-# 7. After we are done with pre-processing, it is necessary to convert the text into plain text document. This helps in pre-processing documents as text documents.
-# corpus <- tm_map(corpus, PlainTextDocument)
-# corpus
 
-
-# 8. For further processing, we’ll create a document matrix where the text will categorized in columns
-
-
-
-#document matrix
-?DocumentTermMatrix
+# 10. For further processing, we’ll create a document matrix where the text will categorized in columns
 frequencies <- DocumentTermMatrix(corpus) 
+## view sparsity and summary:
 frequencies
+## view subset of document term matrix
 inspect(frequencies[1:2,1000:1005])
 
-?grep
-inspect(frequencies[1:2,which(colnames(frequencies))])
 
-# noticed weird characters
+# 11. noticed weird characters
 # find non a-z chars and replace them if regular words
-length(colnames(frequencies))
-head(grep('[^a-z]+',colnames(frequencies)))
 ## 79 ingredients with weird chars
-colnames(frequencies)[grep('[^a-z]+',colnames(frequencies))]
-head(colnames(frequencies)[which(colnames(frequencies) %in% c('gruyer','acai','gruyèr','pate','ragu','pure','creme'))])
+head(grep('[^a-z]+',colnames(frequencies)))
 
+## manually clean these weird characters
 corpus <- tm_map(corpus, content_transformer(gsub), pattern = "(®|™|’)", replacement = "")
 corpus <- tm_map(corpus, content_transformer(gsub), pattern = "è", replacement = "e")
 corpus <- tm_map(corpus, content_transformer(gsub), pattern = "é", replacement = "e")
@@ -264,109 +236,66 @@ corpus <- tm_map(corpus, content_transformer(gsub), pattern = "€", replacement
 corpus <- tm_map(corpus, content_transformer(gsub), pattern = "ú", replacement = "u")
 
 
-
-# "organic®" # could indicate organic brand name, but probably better to just make normal organic word
-# "rice®"
-# "gruyèr" => "gruyer"
-# "açai" --> "acai"
-# "tabasco®"
-# pâté pâte
-# neufchâtel
-# white®
-# bell®
-# "giant™"
-
-#some numbers still pop up
-
-## curly single quote "sheep’"
+## 12. Recreate Document Term Matrix after removing weird characters
+frequencies <- DocumentTermMatrix(corpus)
 
 
-
-#organizing frequency of terms
-freq <- colSums(as.matrix(frequencies))
-length(freq)
-
-#create sort order (descending) for frequency
-ord <- order(freq,decreasing=TRUE)
-
-#inspect most frequently occurring terms
-freq[head(ord)]   
-
-#inspect least frequently occurring terms
-freq[tail(ord)]   
-
+# 13. Filter down to words with 3+ characters and 3+ ocurrences
 filtered_frequencies <- DocumentTermMatrix(corpus, 
-   control=list(wordLengths=c(3, Inf), bounds = list(global = c(3,Inf))))
-inspect(filtered_frequencies[1:2,1:15])
+   control=list(wordLengths=c(3, Inf), bounds = list(global = c(3,Inf)))
+   )
 filtered_frequencies
 
 
 
-#organizing frequency of terms
-freq <- colSums(as.matrix(filtered_frequencies))
-length(freq)
+# 14. Analyze frequent / infrequent terms
+# Sort terms by frequency
+# freq <- colSums(as.matrix(filtered_frequencies))
+# length(freq)
+# 
+# #create sort order (descending) for ingredient name length
+# ord <- order(nchar(names(freq)),decreasing=TRUE)
+# 
+# #inspect most frequently occurring terms
+# freq[head(ord)]   
+# 
+# #inspect least frequently occurring terms
+# freq[tail(ord)]
+
+## find most frequent terms with at least 50 ocurrences
+# findFreqTerms(filtered_frequencies,lowfreq=50)
+# 
+# findAssocs(filtered_frequencies,'chees',0.3)
+# findAssocs(filtered_frequencies,'rice',0.15)
+# findAssocs(filtered_frequencies,'banana',0.15)
+# findAssocs(filtered_frequencies,'tofu',0.15)
+# findAssocs(filtered_frequencies,'bok',0.15)
+# findAssocs(filtered_frequencies,'cream',0.15)
+# findAssocs(filtered_frequencies,'coffe',0.1)
+# findAssocs(filtered_frequencies,'egg',0.1)
+# findAssocs(filtered_frequencies,'soda',0.1)
+# findAssocs(filtered_frequencies,'water',0.1)
+# findAssocs(filtered_frequencies,'oatmeal',0.1)
+# findAssocs(filtered_frequencies,'salt',0.1)
+# findAssocs(filtered_frequencies, c('salt','oil'), corlimit=0.30)
+# findAssocs(filtered_frequencies,'pesto',0.1)
+# findAssocs(filtered_frequencies, c('pesto','tomato'), corlimit=0.10)
 
 
 
-#create sort order (descending) for ingredient name length
-ord <- order(nchar(names(freq)),decreasing=TRUE)
-
-#inspect most frequently occurring terms
-freq[head(ord)]   
-
-#inspect least frequently occurring terms
-freq[tail(ord)]
-
-filtered_frequencies
-
-
-findFreqTerms(filtered_frequencies,lowfreq=50)
-
-
-findAssocs(filtered_frequencies,'chees',0.3)
-findAssocs(filtered_frequencies,'rice',0.15)
-
-findAssocs(filtered_frequencies,'banana',0.15)
-
-findAssocs(filtered_frequencies,'tofu',0.15)
-
-findAssocs(filtered_frequencies,'bok',0.15)
-findAssocs(filtered_frequencies,'cream',0.15)
-findAssocs(filtered_frequencies,'coffe',0.1)
-
-findAssocs(filtered_frequencies,'egg',0.1)
-
-findAssocs(filtered_frequencies,'soda',0.1)
-
-findAssocs(filtered_frequencies,'water',0.1)
-findAssocs(filtered_frequencies,'oatmeal',0.1)
-findAssocs(filtered_frequencies,'salt',0.1)
-findAssocs(filtered_frequencies, c('salt','oil'), corlimit=0.30)
-findAssocs(filtered_frequencies,'pesto',0.1)
-findAssocs(filtered_frequencies, c('pesto','tomato'), corlimit=0.10)
-
-
-
-#create data frame
-
+# 15.create data frame with 
 df <- as.data.frame(as.matrix(filtered_frequencies))
 
+# how many recipes does each cuisine have in the training set?
 table(train$cuisine)
 
 
-#add cuisine
+# 16. add cuisine to df, with most common cuisine "italian" for all rows from test dataset
 df$cuisine <- as.factor(c(train$cuisine, rep('italian', nrow(test))))
-# install.packages("gdata")
-library(gdata)
-cuisine_mapping <- mapLevels(df$cuisine)
-cuisine_mapping
 
-# split data into training and test set
+# 17. split data into training and test set
 mytrain <- df[1:nrow(train),]
 mytest <- df[-(1:nrow(train)),]
-
-a <- as.data.frame(cbind(cuisine = train$cuisine, cuisine_id = as.numeric(as.factor(train$cuisine))))
-?factor
 
 # install.packages("xgboost")
 library(xgboost)
@@ -374,57 +303,69 @@ library(Matrix)
 
 
 
-# creating the matrix for training the model
+# 18. creating the matrix for training the model (all term columns minus cuisine)
 ctrain <- xgb.DMatrix(Matrix(data.matrix(mytrain[,!colnames(mytrain) %in% c('cuisine')])), label = as.numeric(mytrain$cuisine)-1)
 
-#Encode the levels as integers
-levels(mytrain$cuisine)
-?levels
-
-#advanced data set preparation
+# 19. test data set preparation (all term columns minus cuisine)
 dtest <- xgb.DMatrix(Matrix(data.matrix(mytest[,!colnames(mytest) %in% c('cuisine')]))) 
 
-watchlist <- list(train = ctrain, test = dtest)
+# watchlist <- list(train = ctrain, test = dtest)
 
-#train multiclass model using softmax
+# train multiclass model using softmax
 
 
-## 200 is too much for my machine?
-## Try with 5 cores
 
 # had to run `brew install libomp` initially in terminal to get caret installation to work on my mac os
 # install.packages("caret", dependencies = TRUE)
 # install.packages("doSNOW", dependencies = TRUE)
-library(caret)
-library(doSNOW)
+# library(caret)
+# library(doSNOW)
+## start cluster
+# cl2 <- makeCluster(6, type = "SOCK")
+# registerDoSNOW(cl2)
 
-  ## start cluster
-  cl2 <- makeCluster(6, type = "SOCK")
-  registerDoSNOW(cl2)
+# Shutdown cluster
+# stopCluster(cl2)
 
-
-#first model
-xgbmodel <- xgboost(data = ctrain, max.depth = 25, eta = 0.3, nround = 30, objective = "multi:softmax", num_class = 20, verbose = 1
+# 20. train first model with 30 iterations using softmax
+xgbmodel <- xgboost(data = ctrain, max.depth = 25, eta = 0.3, nround = 60, objective = "multi:softmax", num_class = 20, verbose = 1
+                    #, nthread=6 #need to config
                     # , watchlist = watchlist
                     )
 
-  #Shutdown cluster
-  stopCluster(cl2)
-
-mappingTable = data.frame(cuisine=levels(mytrain$cuisine),code=seq(1,length(levels(mytrain$cuisine)))-1,stringsAsFactors = FALSE)
-
-pred_xgbmodel_submit$cuisine <- mappingTable$cuisine[match(pred_xgbmodel_submit$pred_xgbmodel,mappingTable$code)]
-
-  
 ?xgboost
-xgbmodel
+
+# predict 1
+
+# run prediction using trained model on test data set
+# returns column with integers 0-19 corresponding to predicted cuisine labels
+xgbmodel.predict <- predict(xgbmodel, newdata = ctrain)
+
+# returns string versions of cuisine labels
+xgbmodel.predict.text <- levels(mytrain$cuisine)[xgbmodel.predict + 1]
+
+# create a dataframe with original training data + predictions for comparison
+predictions <- cbind(predicted_cuisine = xgbmodel.predict.text, train)
+head(predictions)
+
+View(predictions[which(predictions$predicted_cuisine != predictions$cuisine), ])
+
+# check accuracy on training set = 98.52416% = 1.475838
+1- sum(diag(table(as.integer(as.factor(train$cuisine)), xgbmodel.predict + 1)))/nrow(mytrain) 
+
+
+## alternative approach
+# create a data frame with mapping between cuisine strings and integer values used in model
+mappingTable = data.frame(cuisine=levels(mytrain$cuisine),code=seq(1,length(levels(mytrain$cuisine))),stringsAsFactors = FALSE)
+
 
 pred_xgbmodel <- predict(xgbmodel,dtest)
 pred_xgbmodel_submit <- cbind(pred_xgbmodel,test)
-(mapLevels(pred_xgbmodel_submit$pred_xgbmodel) <- cuisine_mapping)
 
+# add it to 
+pred_xgbmodel_submit$cuisine <- mappingTable$cuisine[match(pred_xgbmodel_submit$pred_xgbmodel,mappingTable$code)]
 
-?mapLevels
+levels(mytrain$cuisine)
 
 
 #second model
