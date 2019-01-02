@@ -604,7 +604,7 @@ cowplot::plot_grid(b1,b2, ncol=1, labels = "AUTO")
 * age: children do have better survival rates, otherwise a wash. could try to separate young misses vs. older misses better -- this might matter for 2nd class (not so much for 1st / 3rd)
 
 
-## (2) Exploratory modeling 1
+## (2) Exploratory modeling
 
 ### Load Tools:
 ```{r echo = FALSE}
@@ -612,7 +612,7 @@ library(randomForest)
 # install.packages("rpart")
 # install.packages("rpart.plot")
 library(rpart)
-library(rpart.plot)
+# library(rpart.plot)
 # had to run `brew install libomp` initially in terminal to get caret installation to work on my mac os
 # install.packages("caret"), dependencies = TRUE)
 # install.packages("doSNOW", dependencies = TRUE)
@@ -686,7 +686,7 @@ rf.3
 ```
 
 #### Model 4: Random Forest - title, pclass,sex, family.size
-16.95% OOB error rate
+16.84% OOB error rate
 
 ```{r echo = FALSE}
 
@@ -767,8 +767,8 @@ rf.6 <- randomForest(x = rf.train.6
 ## view confusion matrix
 rf.6
 
-varImpPlot(rf.6)
-?varImp
+# plot feature importance
+# varImpPlot(rf.6)
 
 ```
 ```{r echo=FALSE}
@@ -777,20 +777,36 @@ combined$miss.alone <- ifelse(combined$sex=="female"
                & combined$title == "Miss."
                & combined$family.size == 0,TRUE,FALSE)
 
-#try identifying misses alone
+#try identifying mrses alone
 combined$mrs.alone <- ifelse(combined$sex=="female"
                & combined$title == "Mrs."
                & combined$family.size == 0,TRUE,FALSE)
 ```
 
 
+
+### Run Cross Validation
+
+Using Repeated K-Fold Cross Validation
+
+* with 3 folds
+* and 10 iterations
+
+And using random partitioning decision trees, so we can understand feature importance more easily.
+
+#### Set up wrapper functions for running CV using Rpart and randomForest
 ```{r echo=FALSE}
+## recursive partitioning (rpart) & regression trees wrapper function for running cross validation
+## using N cores
+## given features, labels, seed, and CV Control object.
 rpart.cv <- function(seed, training, labels, ctrl) {
-  cl <- makeCluster(3, type = "SOCK")
+  #Start cluster
+  cl <- makeCluster(6, type = "SOCK")
   registerDoSNOW(cl)
   
   set.seed(seed)
   # Leverage formula interface for training
+  # this runs cross validation
   rpart.cv <- train(x = training, y = labels, method = "rpart", tuneLength = 30, 
                     trControl = ctrl)
   
@@ -800,124 +816,207 @@ rpart.cv <- function(seed, training, labels, ctrl) {
   return (rpart.cv)
 }
 
+## randomForest wrapper function for running cross validation
+## using N cores
+## given features, labels, seed, and CV Control object.
+rforest.cv <- function(seed, training, labels, ctrl) {
+  #Start cluster
+  cl <- makeCluster(6, type = "SOCK")
+  registerDoSNOW(cl)
+  
+  set.seed(seed)
+  # Leverage formula interface for training
+  # this runs cross validation
+  rForest.cv <- train(x = training, y = labels, method = "rf", tuneLength = 30, , ntree = 1000,
+                    trControl = ctrl)
+  
+  #Shutdown cluster
+  stopCluster(cl)
+  
+  return (rForest.cv)
+}
+
 ## try k-fold cross validation with 3 folds (67% of data used to train)
 ## without knowingn anything about data, 10folds is good to start
 ## but also, usually mimicking proportions of actual training and test data sets works well.
 set.seed(54321)
+
+# returns indices of rf.label to train model
+# 3 folds, run 10 times
+# folds split training data into 3rds such that each row from training set is used once per iteration
+# by averaging error over these folds / iterations, we get a better sense of the model's prediction power on generalized data. still could be inaccurate if training data is biased.
 cv.3.folds <- createMultiFolds(rf.label, k = 3, times = 10)
 
-
 ## set up caret's trainControl object
+## 3 folds, run 10 times
+## pass in the 
 ctrl.3 <- trainControl(method = "repeatedcv", number = 3, repeats = 10
                        , index = cv.3.folds)
 
+```
+
+#### Model 5: Rpart - title, pclass,sex, family.size 0.8282 Accuracy with rpart, 0.8236 Accuracy with rforest 1000 trees
+```{r}
 # Grab features
-features <- c("title","pclass","sex","family.size","avg.fare","miss.alone")
+features <- c("title","pclass","sex","family.size")
 rpart.train.1 <- combined[1:891, features]
 
-# Run CV and check out results
+# Run rpart CV and check out results
 rpart.1.cv.1 <- rpart.cv(94622, rpart.train.1, rf.label, ctrl.3)
 rpart.1.cv.1
 
+# Plot
+# prp(rpart.1.cv.1$finalModel, type = 0, extra = 1, under = TRUE)
+
+
+# Run rforest CV and check out results
+rForest.1.cv.1 <- rforest.cv(94622, rpart.train.1, rf.label, ctrl.3)
+rForest.1.cv.1
+
+
+```
+
+#### Model 6: Rpart - title, pclass,sex, family.size, avg.fare, 0.8327 Accuracy using rpart, 0.8259 Accuracy using randomForest with 1000 trees
+```{r}
+# Grab features
+features <- c("title","pclass","sex","family.size","avg.fare")
+rpart.train.1 <- combined[1:891, features]
+
+# Run rpart CV and check out results
+rpart.1.cv.1 <- rpart.cv(94622, rpart.train.1, rf.label, ctrl.3)
+rpart.1.cv.1
 
 # Plot
-prp(rpart.1.cv.1$finalModel, type = 0, extra = 1, under = TRUE)
+# prp(rpart.1.cv.1$finalModel, type = 0, extra = 1, under = TRUE)
 
-combined[which(!(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
-               & combined$pclass == 3
-               & combined$family.size < 4),]
+# Run rforest CV and check out results
+rForest.1.cv.1 <- rforest.cv(94622, rpart.train.1, rf.label, ctrl.3)
+rForest.1.cv.1
 
-combined[which(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
-               ,]
+
+```
+
+
+### Best model based on CV is RPart using title, pclass,sex, family.size, avg.fare, 0.8327 Accuracy
+
+Make Predictions
+```{r}
+
+## best model
+rpart.6 <- rpart(data = combined[1:891,]
+                 , survived ~ title + pclass + sex + family.size + avg.fare)
+
+features <- c("title","pclass","sex","family.size","avg.fare")
+
+
+# predict on training set
+predictions <- predict(rpart.6, newdata = combined[1:891, features],type = "vector")
+
+predictions <- predictions-1
+predictions <- data.frame(
+  predicted = predictions
+  , PassengerId = combined$passengerid[1:891]
+  , Survived = combined$survived[1:891]
+  )
+
+
+## accuracy on training set = 0.84736
+nrow(predictions[which(predictions$predicted == predictions$Survived),]) / nrow(predictions)
+
+# predict on test set
+rpart.test.6 <- combined[892:nrow(combined), features]
+predictions <- predict(rpart.6, newdata = rpart.test.6,type = "vector")
+
+predictions <- predictions-1
+predictions <- data.frame(PassengerId = combined$passengerid[892:1309],Survived = predictions)
+
+
+# write to csv for submission
+write.csv(predictions
+          , file="predictions.csv"
+          , row.names = FALSE)
+
+```
+
+
+### Other Analysis 
+
+#### Look at (male) titles that are predicted 100% not survived
+```{r echo = FALSE}
+
+# look at key populations that are incorrectly predicted
+# and potential features that could aid in predicting survival
+# combined[which(!(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
+#                & combined$pclass == 3
+#                & combined$family.size < 4),]
+# 
+# combined[which(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
+#                ,]
 
 
 ## look at passengers ordered by ticket
-combined.sortbyticket <- combined %>%
-  arrange(pclass, ticket)
+# combined.sortbyticket <- combined %>%
+  # arrange(pclass, ticket)
 
-View(combined.sortbyticket)
-
-
-
-
-
+# View(combined.sortbyticket)
 ```
 
 
+
+#### Determine if Mrses are onboard without husband and if that matters
 ```{r}
 
-combined$name
-sub("Mrs\\..*\\(","", combined$name)
-?sub
-# install.packages("gsubfn")
-library(gsubfn)
-
-combined$husband.name <- gsub(" \\(", "", gsub("Mrs. ", "", strapplyc(combined$name, "Mrs\\..*\\(", simplify = TRUE)))
-combined$husband.name
-combined$first.name
-
-name.splits <- str_split(combined[,"husband.name"],' ')
-name.splits <- str_split(sapply(name.splits,"[", 1), " ")
-combined$husband.first.name <- name.splits
-combined$husband.first.name2 <- ifelse(combined$title == "Mrs.", combined$first.name, NA)
-
-combined$husband.first_name2 <- combined[which(str_detect(combined$husband.first.name2,"\\(")),"husband.first.name2"] <- NA
-
-husband.count <- rep(0, nrow(combined))
-husband.names <- unique(combined$husband.first.name2)
-unique.tickets <- unique(combined$ticket)
-
-unique.tickets
-
-## Identify if Mrs. passengers had husband onboard based on name matches
-for (i in 1:length(unique.tickets)) {
-  current.ticket <- unique.tickets[i]
-  ## get Mrs.'s husband.fname
-  husband.fname <- combined[which(combined$ticket == current.ticket & combined$title == "Mrs."),"husband.first.name2"]
-  ## get indices of matching husbands
-  husband.matches <- which(combined$ticket == current.ticket & combined$title %in% c("Mr.","Officer.","Sir.","Dr.","Rev.") & combined$first.name == husband.fname)
-  ## calculate average fare per passenger for this ticket
-  husband.count[which(combined$ticket == current.ticket & combined$title == "Mrs.")] <- length(husband.matches)
-}
-
-combined$husband.onboard <- ifelse(husband.count>0, TRUE, FALSE)
-
-husband.onboard.summary <- combined[1:891,] %>% 
-  group_by(husband.onboard, pclass, survived) %>% 
-  filter(title=="Mrs.") %>%
-  summarize(count=n()) %>% 
-  mutate(pct = count/sum(count))
-
-d1 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = pct, fill = survived)) +
-  geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
-
-d2 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = count, fill = survived)) +
-  geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
-
-cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
-
-?ggplot
+# # match mrses to their husbands
+# sub("Mrs\\..*\\(","", combined$name)
+# # install.packages("gsubfn")
+# library(gsubfn)
+# 
+# combined$husband.name <- gsub(" \\(", "", gsub("Mrs. ", "", strapplyc(combined$name, "Mrs\\..*\\(", simplify = TRUE)))
+# combined$husband.name
+# combined$first.name
+# 
+# name.splits <- str_split(combined[,"husband.name"],' ')
+# name.splits <- str_split(sapply(name.splits,"[", 1), " ")
+# combined$husband.first.name <- name.splits
+# combined$husband.first.name2 <- ifelse(combined$title == "Mrs.", combined$first.name, NA)
+# 
+# combined$husband.first_name2 <- combined[which(str_detect(combined$husband.first.name2,"\\(")),"husband.first.name2"] <- NA
+# 
+# husband.count <- rep(0, nrow(combined))
+# husband.names <- unique(combined$husband.first.name2)
+# unique.tickets <- unique(combined$ticket)
+# 
+# unique.tickets
+# 
+# ## Identify if Mrs. passengers had husband onboard based on name matches
+# for (i in 1:length(unique.tickets)) {
+#   current.ticket <- unique.tickets[i]
+#   ## get Mrs.'s husband.fname
+#   husband.fname <- combined[which(combined$ticket == current.ticket & combined$title == "Mrs."),"husband.first.name2"]
+#   ## get indices of matching husbands
+#   husband.matches <- which(combined$ticket == current.ticket & combined$title %in% c("Mr.","Officer.","Sir.","Dr.","Rev.") & combined$first.name == husband.fname)
+#   ## calculate average fare per passenger for this ticket
+#   husband.count[which(combined$ticket == current.ticket & combined$title == "Mrs.")] <- length(husband.matches)
+# }
+# 
+# combined$husband.onboard <- ifelse(husband.count>0, TRUE, FALSE)
+# 
+# husband.onboard.summary <- combined[1:891,] %>% 
+#   group_by(husband.onboard, pclass, survived) %>% 
+#   filter(title=="Mrs.") %>%
+#   summarize(count=n()) %>% 
+#   mutate(pct = count/sum(count))
+# 
+# d1 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = pct, fill = survived)) +
+#   geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
+# 
+# d2 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = count, fill = survived)) +
+#   geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
+# 
+# cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
+# 
+# ?ggplot
 
 
 ```
 
-### Cross validate
-
-
-### 
-
-## (3) Cross Validation
-
-## (4) 
-
-
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

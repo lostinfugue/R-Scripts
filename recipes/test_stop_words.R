@@ -1,0 +1,6 @@
+# install.packages("tidytext",dependencies=TRUE)
+# install.packages("generics", dependencies=TRUE)
+# library(generics)
+library(tidytext)
+head(stop_words)
+View(stop_words)
