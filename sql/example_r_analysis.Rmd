@@ -1,0 +1,93 @@
+---
+title: "Example R Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## First time R, R Studio, and Woden Setup 
+
+1. Install Latest versions of R & R Studio
+* R: https://cran.r-project.org/mirrors.html
+* R Studio: https://www.rstudio.com/products/rstudio/download/#download
+
+2. First-time RJDBC setup for MacOs: After installing R, the steps on this page first need to be done to make the rJava and RJDBC packages work properly on MacOS
+
+* http://www.owsiak.org/r-java-rjava-and-macos-adventures/
+
+3. Then try installing the following packages in R, needed to interact with Woden (Amazon Redshift DB)
+
+```{r}
+## install packages needed to connect to redshift db
+# install.packages("rJava")
+# install.packages("RJDBC")
+```
+
+
+## Connect to Woden
+
+### Load packages
+```{r}
+# library(rJava)
+library(RJDBC)
+```
+
+### Open Connection to Woden
+
+```{r echo=FALSE}
+# update these
+redshift_driver_path <- "/Users/jeffreyli/Downloads/RedshiftJDBC42-1.2.1.1001.jar"
+woden.user <- "jeffli"
+woden.pwd <- "hQtK5YuVqJ0cL9eu3Tx1I9KiCSjB8Gdf"
+```
+
+```{r}
+# update these
+redshift_driver_path <- "/Users/jeffreyli/Downloads/RedshiftJDBC42-1.2.1.1001.jar"
+#woden.user <- "XX"
+#woden.pwd <- "XX"
+
+# connect to Amazon Redshift
+driver <- JDBC("com.amazon.redshift.jdbc.Driver", redshift_driver_path, identifier.quote="`")
+url <- paste("jdbc:postgresql://woden-redshift.p11a.com:5439/woden?user=",woden.user,"&password=",woden.pwd, sep="")
+
+conn <- dbConnect(driver, url)
+```
+
+## Basic Analysis: Select, Create/Drop Statements in Woden
+
+### Create temp table(s) using SQL statement(s), view its contents, and store it in an R data frame for analysis in R.
+```{r}
+
+# run drop / create temp table statements in redshift
+dbSendUpdate(conn,
+  "
+  drop table if exists #test_jeff_table3;
+  create table #test_jeff_table3 as 
+  select case when user_computed_email_domain_group in ('GMAIL','YAHOO','AOL','MSN') then user_computed_email_domain_group else 'OTHER' end as domain_group
+  , count(*)
+  from dbm.jc_mailable_universe_matrix_classification
+  group by 1
+  order by 1;
+  ")
+
+# run select statement in redshift and view result
+dbGetQuery(conn, 
+  "
+  select * from #test_jeff_table3;
+  ")
+
+# run query on temp table and store result in R dataframe
+result <- dbGetQuery(conn, "select * from #test_jeff_table3")
+
+```
+
+
+Disconnect from Woden Connection
+```{r results = FALSE}
+# close connection
+dbDisconnect(conn)
+```

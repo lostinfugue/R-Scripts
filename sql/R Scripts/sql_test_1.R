@@ -19,7 +19,27 @@ url <- "jdbc:postgresql://woden-redshift.p11a.com:5439/woden?user=jeffli&passwor
 conn <- dbConnect(driver, url)
 
 
-# write select
+# run drop / create temp table statements in redshift
+dbSendUpdate(conn,
+  "
+  drop table if exists #test_jeff_table3;
+  create table #test_jeff_table3 as 
+  select case when user_computed_email_domain_group in ('GMAIL','YAHOO','AOL','MSN') then user_computed_email_domain_group else 'OTHER' end as domain_group
+  , count(*)
+  from dbm.jc_mailable_universe_matrix_classification
+  group by 1
+  order by 1;
+  ")
+
+# run select statement in redshift and view result
+dbGetQuery(conn, 
+  "
+  select * from #test_jeff_table3;
+  ")
+
+# run query on temp table and store result in R dataframe
+result <- dbGetQuery(conn, "select * from #test_jeff_table3")
+
 sqlText <- "
   select case when user_computed_email_domain_group in ('GMAIL','YAHOO','AOL','MSN') then user_computed_email_domain_group else 'OTHER' end as domain_group
   , count(*)
