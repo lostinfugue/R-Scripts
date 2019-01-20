@@ -4,9 +4,9 @@
 ##
 ## LOGIC:
 ## The number of optimal clusters, k, is the lowest value that
-## returns k clusters where the maximum distance between 
+## returns k clusters where the maximum distance between
 ## each event and its assigned cluster centroid is LESS THAN 100 miles.
-## 
+##
 ## IMPLEMENTATION:
 ## Iteratively search through values of k
 ## to find the optimal value of k using binary-search
@@ -100,12 +100,12 @@ fairs <- dbGetQuery(conn, sqlText)
 ## - n_clusters: number of clusters to run on the k means algorithm, default = 5
 ## - n_start: tuning parameter for k means algorithm, default = 40
 ## - maximum distance: the maximum distance in latitude/longitude units desired
-## between a cluster's centroid and its farthest allocated event. 
+## between a cluster's centroid and its farthest allocated event.
 ## default = 1.45 == 100 miles
 ##
 ## OUTPUT:
 ## returns a list with two values
-## (1) TRUE/FALSE: is the maximum distance between an event 
+## (1) TRUE/FALSE: is the maximum distance between an event
 ## and its cluster centroid lower than the maximum distance allowed?
 ## (2) the dataframe of event clusters
 ## - event_id
@@ -113,10 +113,10 @@ fairs <- dbGetQuery(conn, sqlText)
 ## - longitude
 ## - cluster
 ## - distance: from event to cluster centroid in lat/lon units
-## 
-is_kmeans_distance_ok <- function(fairs, 
+##
+is_kmeans_distance_ok <- function(fairs,
                                   n_clusters = 5,
-                                  n_start = 40, 
+                                  n_start = 40,
                                   max_distance = 1.45) {
   ## get event ids labels
   fair_ids <- fairs$event_id
@@ -126,19 +126,19 @@ is_kmeans_distance_ok <- function(fairs,
   set.seed <- 12345
   ## run kmeans for given value on given latitude/longitude pairs
   k <- kmeans(fair_coordinates,n_clusters,nstart=n_start)
-  
+
   ## take cluster outputs and merge them back with the event data
   clusters <- as.data.frame(k$cluster)
   clusters <- cbind(fair_ids, fair_coordinates, clusters)
   colnames(clusters) <- c("event_id","latitude","longitude","cluster")
   cluster_centers <- cbind(cluster=rep(1:n_clusters), as.data.frame(k$centers))
   clusters <- merge(clusters, cluster_centers, by = "cluster", sort = TRUE, suffixes=c("_event",'_centroid'))
-  
+
   ## compute the distance between each event and its cluster centroid
   clusters$distance <- ((clusters$longitude_event-clusters$longitude_centroid)^2 + (clusters$latitude_event-clusters$latitude_centroid)^2)^0.5
-  
+
   ## return a list with two values
-  ## (1) TRUE/FALSE: is the maximum distance between an event 
+  ## (1) TRUE/FALSE: is the maximum distance between an event
   ## and its cluster centroid lower than the maximum distance allowed?
   ## (2) the dataframe of event clusters
   distance <- max(clusters$distance)
@@ -168,7 +168,7 @@ while (TRUE) {
   # print(n_try)
   # print(a[[1]])
   # print(max(a[[2]]$distance))
-  
+
   ## does it meet the distance restriction?
   if(a[[1]]) {
     lowest_viable_n <- n_try
@@ -186,7 +186,7 @@ while (TRUE) {
         optimal_cluster <- a[[2]]
       }
       break
-    } 
+    }
     else {
       n_min <- n_try
     }

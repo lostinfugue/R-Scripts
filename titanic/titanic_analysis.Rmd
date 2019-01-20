@@ -14,7 +14,7 @@ Review material from Data Analysis and highlight key learnings
 
 
 ## (1) Initial Data Analysis
-### Load data into R 
+### Load data into R
 using `read.csv` method
 ```{r results = "hide"}
 test <- read.csv("test.csv",header = TRUE)
@@ -84,8 +84,8 @@ We can see the data types.
 summary(train)
 ```
 
-#### Look at train vs. test splits. 
-* About 2/3 train (1:891), 1/3 test (892:1309) 
+#### Look at train vs. test splits.
+* About 2/3 train (1:891), 1/3 test (892:1309)
 * Union together using `rbind()` into a combined dataframe in which we store any newly engineered features so that they are available both when training and testing our models.   
 * At this point we can convert data types if it makes analysis easier.  or make a new column with the data with new data type.
 ```{r results="hide"}
@@ -110,7 +110,7 @@ combined$name <- as.character(combined$name)
 * `ggplot2`: use for plots
 * `cowplot`: use for plotting multiple graphs side-by-side
 * `stringr`: use for manipulating strings
-```{r message=FALSE} 
+```{r message=FALSE}
 library(dplyr)
 library(gmodels)
 library(ggplot2)
@@ -121,7 +121,7 @@ library(stringr)
 
 #### survived
 
-* training set: 
+* training set:
     + 549 (62%) perished
     + 342 (38%) survived
 ```{r results="hide"}
@@ -130,40 +130,40 @@ CrossTable(train$survived)
 ```
 ```{r}
 ## using dplyr
-combined[1:891,] %>% 
-  group_by(survived) %>% 
-  summarize(count=n()) %>% 
+combined[1:891,] %>%
+  group_by(survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 ```
 
 #### pclass
 Predictive? **Yes**
 
-* survival rates 
+* survival rates
     + 63% in 1st class
     + 48% in 2nd class
     + 24% in 3rd class
 ```{r echo=FALSE, eval=FALSE}
-combined[1:891,] %>% 
-  group_by(pclass, survived) %>% 
-  summarize(count=n()) %>% 
+combined[1:891,] %>%
+  group_by(pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 ```
-* % of passengers 
+* % of passengers
     + 3rd class: 55%
     + 1st: 24%
     + 2nd: 21%
 ```{r echo=FALSE, eval=FALSE}
-combined[1:891,] %>% 
-  group_by(pclass) %>% 
-  summarize(count=n()) %>% 
+combined[1:891,] %>%
+  group_by(pclass) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count), pct2 = count/sum(sum(count)))
 ```
 
 ```{r echo=FALSE}
-pclass.summary <- combined[1:891,] %>% 
-  group_by(pclass, survived) %>% 
-  summarize(count=n()) %>% 
+pclass.summary <- combined[1:891,] %>%
+  group_by(pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 a1 <- ggplot(pclass.summary, aes(x= pclass, y = pct, fill = survived)) +
@@ -178,20 +178,20 @@ cowplot::plot_grid(a1,a2, ncol=1, labels = "AUTO")
 #### sex
 Predictive: **Yes**
 
-* survival rates 
+* survival rates
     + 74% for female
     + 19% for male
 ```{r echo=FALSE, eval=FALSE}
-combined[1:891,] %>% 
-  group_by(sex, survived) %>% 
-  summarize(count=n()) %>% 
+combined[1:891,] %>%
+  group_by(sex, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 ```
 
 ```{r echo=FALSE}
-sex.summary <- combined[1:891,] %>% 
-  group_by(sex, survived) %>% 
-  summarize(count=n()) %>% 
+sex.summary <- combined[1:891,] %>%
+  group_by(sex, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 b1 <- ggplot(sex.summary, aes(x= sex, y = pct, fill = survived)) +
@@ -219,9 +219,9 @@ Otherwise, only really showing that children had better survival rates.
 # bin age by 10
 combined$age.bin <- cut(ifelse(is.na(combined$age),105, combined$age), c(0,10,20,30,40,50,60,80,120), labels = c(0,10,20,30,40,50,60,"na"))
 
-age.bin.summary <- combined[1:891,] %>% 
-  group_by(age.bin, sex, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+age.bin.summary <- combined[1:891,] %>%
+  group_by(age.bin, sex, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 b1 <- ggplot(age.bin.summary, aes(x= age.bin, y = pct, fill = survived)) +
@@ -250,7 +250,7 @@ Predictive? **Yes**
 
 Extract last names and titles from `name` and add to combined data set
 
-```{r echo=FALSE} 
+```{r echo=FALSE}
 
 ## returns a list of names, where each name is separated into a vector with the part before and after the comma
 name.splits <- str_split(combined[,"name"],', ')
@@ -287,9 +287,9 @@ combined$title <- as.factor(titles)
 Summarize them:
 
 ```{r echo=FALSE}
-title.summary <- combined[1:891,] %>% 
-  group_by(title, survived) %>% 
-  summarize(count=n()) %>% 
+title.summary <- combined[1:891,] %>%
+  group_by(title, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 c1 <- ggplot(title.summary, aes(x= title, y = pct, fill = survived)) +
@@ -318,9 +318,9 @@ summary(combined$sibsp)
 ```
 
 ```{r echo=FALSE}
-sibsp.summary <- combined[1:891,] %>% 
-  group_by(sibsp, survived) %>% 
-  summarize(count=n()) %>% 
+sibsp.summary <- combined[1:891,] %>%
+  group_by(sibsp, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 d1 <- ggplot(sibsp.summary, aes(x= sibsp, y = pct, fill = survived)) +
@@ -343,9 +343,9 @@ summary(combined$parch)
 ```
 
 ```{r echo=FALSE}
-parch.summary <- combined[1:891,] %>% 
-  group_by(parch, survived) %>% 
-  summarize(count=n()) %>% 
+parch.summary <- combined[1:891,] %>%
+  group_by(parch, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 d1 <- ggplot(parch.summary, aes(x= parch, y = pct, fill = survived)) +
@@ -360,9 +360,9 @@ cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
 
 Is having children impactful to survival?  less is better
 ```{r echo=FALSE, results=FALSE, fig.height=12}
-parch.summary <- combined[1:891,] %>% 
-  group_by(parch, title, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+parch.summary <- combined[1:891,] %>%
+  group_by(parch, title, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 d1 <- ggplot(parch.summary, aes(x= parch, y = pct, fill = survived)) +
@@ -382,9 +382,9 @@ Predictive? **Maybe**
 
 ```{r echo = FALSE}
 combined$family.size <- combined$sibsp + combined$parch
-family.size.summary <- combined[1:891,] %>% 
-  group_by(family.size, survived) %>% 
-  summarize(count=n()) %>% 
+family.size.summary <- combined[1:891,] %>%
+  group_by(family.size, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 d1 <- ggplot(family.size.summary, aes(x= family.size, y = pct, fill = survived)) +
@@ -403,9 +403,9 @@ Potential `survival` vs. `family.size` trends:
 * Miss / Mrses 3rd class
 
 ```{r echo=FALSE, fig.height=10}
-family.size.summary <- combined[1:891,] %>% 
-  group_by(family.size, title, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+family.size.summary <- combined[1:891,] %>%
+  group_by(family.size, title, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 d1 <- ggplot(family.size.summary, aes(x= family.size, y = pct, fill = survived)) +
@@ -454,7 +454,7 @@ for (i in 1:length(tickets)) {
   party.indexes <- which(combined$ticket == current.ticket)
   ## calculate average fare per passenger for this ticket
   avg.current.fare <- combined[party.indexes[1], "fare"] / length(party.indexes)
-  
+
   ## set avg fare and ticket party size for those people in that ticket party.
   for (j in 1:length(party.indexes)) {
     ticket.party.size[party.indexes[j]] <- length(party.indexes)
@@ -474,7 +474,7 @@ summary(combined$avg.fare)
 
 ## impute value for 1 missing avg fare from 370 similar passengers
 combined[which(is.na(combined$avg.fare)),]
-combined[which(combined$passengerid == "1044"),"avg.fare"] <- mean(combined[which(combined$sex == "male" 
+combined[which(combined$passengerid == "1044"),"avg.fare"] <- mean(combined[which(combined$sex == "male"
                & combined$pclass == 3
                & combined$family.size == 0
                & combined$title == "Mr."
@@ -489,7 +489,7 @@ Graph relationship between survival and avg fare, by class and title.
 * family.size definitely seems to be an indicator for survival within pclass = 3
 ```{r echo=FALSE}
 ## graph relationship between survival and avg fare, by class and title
-ggplot(combined[1:891,], aes(x = avg.fare, y = family.size, color = survived)) + 
+ggplot(combined[1:891,], aes(x = avg.fare, y = family.size, color = survived)) +
   geom_point() +
   facet_wrap(~title+pclass, ncol = 3)
 ```
@@ -505,9 +505,9 @@ Appears like first class has the most reported cabin data.  Yet not much of a tr
 ```{r echo=FALSE}
 combined$cabin.first.letter <- as.factor(ifelse(substring(combined$cabin,1,1)=="","U",substring(combined$cabin,1,1)))
 
-cabin.first.letter.summary <- combined[1:891,] %>% 
-  group_by(cabin.first.letter, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+cabin.first.letter.summary <- combined[1:891,] %>%
+  group_by(cabin.first.letter, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 a1 <- ggplot(cabin.first.letter.summary, aes(x= cabin.first.letter, y = pct, fill = survived)) +
@@ -522,13 +522,13 @@ cowplot::plot_grid(a1,a2, ncol=1, labels = "AUTO")
 
 ```
 
-Look at people with multiple cabins: 
+Look at people with multiple cabins:
 
 **Training**: ```r length(train[grep(" ",train$cabin),"cabin"])``` of ```r length(which(train$cabin!=""))``` => ```r round(length(train[grep(" ",train$cabin),"cabin"])/length(which(train$cabin!=""))*100, 0)``` % of reported cabins in training dataset, or ```r round(length(train[grep(" ",train$cabin),"cabin"])/length(train$cabin)*100, 0)``` % of total training dataset
 
 **Combined**: ```r length(combined[grep(" ",combined$cabin),"cabin"])``` of ```r length(which(combined$cabin!=""))``` => ```r round(length(combined[grep(" ",combined$cabin),"cabin"])/length(which(combined$cabin!=""))*100, 0)```% of reported cabins in combined data set, or ```r round(length(combined[grep(" ",combined$cabin),"cabin"])/length(combined$cabin)*100, 0)``` % of total combined dataset
 
-Create a feature: 
+Create a feature:
 
 * U = unreported cabin
 * S = single cabin
@@ -544,9 +544,9 @@ combined$cabin.agg <- as.factor(ifelse(combined$cabin==""
                                      ,"S")))
 
 
-cabin.agg.summary <- combined[1:891,] %>% 
-  group_by(cabin.agg, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+cabin.agg.summary <- combined[1:891,] %>%
+  group_by(cabin.agg, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 a1 <- ggplot(cabin.agg.summary, aes(x= cabin.agg, y = pct, fill = survived)) +
@@ -568,9 +568,9 @@ combined$cabin.agg <- as.factor(ifelse(combined$cabin.agg=="M","S", combined$cab
 Predictive? **No**, controlling for pclass, the survival rates look similar from each embarked location
 
 ```{r}
-embarked.summary <- combined[1:891,] %>% 
-  group_by(embarked, pclass, survived) %>% 
-  summarize(count=n()) %>% 
+embarked.summary <- combined[1:891,] %>%
+  group_by(embarked, pclass, survived) %>%
+  summarize(count=n()) %>%
   mutate(pct = count/sum(count))
 
 b1 <- ggplot(embarked.summary, aes(x= embarked, y = pct, fill = survived)) +
@@ -803,16 +803,16 @@ rpart.cv <- function(seed, training, labels, ctrl) {
   #Start cluster
   cl <- makeCluster(6, type = "SOCK")
   registerDoSNOW(cl)
-  
+
   set.seed(seed)
   # Leverage formula interface for training
   # this runs cross validation
-  rpart.cv <- train(x = training, y = labels, method = "rpart", tuneLength = 30, 
+  rpart.cv <- train(x = training, y = labels, method = "rpart", tuneLength = 30,
                     trControl = ctrl)
-  
+
   #Shutdown cluster
   stopCluster(cl)
-  
+
   return (rpart.cv)
 }
 
@@ -823,16 +823,16 @@ rforest.cv <- function(seed, training, labels, ctrl) {
   #Start cluster
   cl <- makeCluster(6, type = "SOCK")
   registerDoSNOW(cl)
-  
+
   set.seed(seed)
   # Leverage formula interface for training
   # this runs cross validation
   rForest.cv <- train(x = training, y = labels, method = "rf", tuneLength = 30, , ntree = 1000,
                     trControl = ctrl)
-  
+
   #Shutdown cluster
   stopCluster(cl)
-  
+
   return (rForest.cv)
 }
 
@@ -849,7 +849,7 @@ cv.3.folds <- createMultiFolds(rf.label, k = 3, times = 10)
 
 ## set up caret's trainControl object
 ## 3 folds, run 10 times
-## pass in the 
+## pass in the
 ctrl.3 <- trainControl(method = "repeatedcv", number = 3, repeats = 10
                        , index = cv.3.folds)
 
@@ -939,7 +939,7 @@ write.csv(predictions
 ```
 
 
-### Other Analysis 
+### Other Analysis
 
 #### Look at (male) titles that are predicted 100% not survived
 ```{r echo = FALSE}
@@ -949,7 +949,7 @@ write.csv(predictions
 # combined[which(!(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
 #                & combined$pclass == 3
 #                & combined$family.size < 4),]
-# 
+#
 # combined[which(combined$title %in% c("Dr.","Mr.","Officer.","Reverend.","Sir."))
 #                ,]
 
@@ -970,24 +970,24 @@ write.csv(predictions
 # sub("Mrs\\..*\\(","", combined$name)
 # # install.packages("gsubfn")
 # library(gsubfn)
-# 
+#
 # combined$husband.name <- gsub(" \\(", "", gsub("Mrs. ", "", strapplyc(combined$name, "Mrs\\..*\\(", simplify = TRUE)))
 # combined$husband.name
 # combined$first.name
-# 
+#
 # name.splits <- str_split(combined[,"husband.name"],' ')
 # name.splits <- str_split(sapply(name.splits,"[", 1), " ")
 # combined$husband.first.name <- name.splits
 # combined$husband.first.name2 <- ifelse(combined$title == "Mrs.", combined$first.name, NA)
-# 
+#
 # combined$husband.first_name2 <- combined[which(str_detect(combined$husband.first.name2,"\\(")),"husband.first.name2"] <- NA
-# 
+#
 # husband.count <- rep(0, nrow(combined))
 # husband.names <- unique(combined$husband.first.name2)
 # unique.tickets <- unique(combined$ticket)
-# 
+#
 # unique.tickets
-# 
+#
 # ## Identify if Mrs. passengers had husband onboard based on name matches
 # for (i in 1:length(unique.tickets)) {
 #   current.ticket <- unique.tickets[i]
@@ -998,25 +998,24 @@ write.csv(predictions
 #   ## calculate average fare per passenger for this ticket
 #   husband.count[which(combined$ticket == current.ticket & combined$title == "Mrs.")] <- length(husband.matches)
 # }
-# 
+#
 # combined$husband.onboard <- ifelse(husband.count>0, TRUE, FALSE)
-# 
-# husband.onboard.summary <- combined[1:891,] %>% 
-#   group_by(husband.onboard, pclass, survived) %>% 
+#
+# husband.onboard.summary <- combined[1:891,] %>%
+#   group_by(husband.onboard, pclass, survived) %>%
 #   filter(title=="Mrs.") %>%
-#   summarize(count=n()) %>% 
+#   summarize(count=n()) %>%
 #   mutate(pct = count/sum(count))
-# 
+#
 # d1 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = pct, fill = survived)) +
 #   geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
-# 
+#
 # d2 <- ggplot(husband.onboard.summary, aes(x= husband.onboard, y = count, fill = survived)) +
 #   geom_bar(stat="identity", width = 0.7) + facet_wrap(~pclass) + ggtitle("pclass")
-# 
+#
 # cowplot::plot_grid(d1,d2, ncol=1, labels = "AUTO")
-# 
+#
 # ?ggplot
 
 
 ```
-
