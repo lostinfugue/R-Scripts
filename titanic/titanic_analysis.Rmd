@@ -2,6 +2,8 @@
 title: "Titanic Analysis Learnings Summary"
 output:
   rmarkdown::github_document
+  #  html_document: default
+  #  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
